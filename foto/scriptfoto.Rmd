@@ -1,0 +1,301 @@
+---
+title: "Fotocondutividade"
+author: "Carlos García Meixide"
+date: "29/3/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r include=FALSE}
+cond_const <- as.data.frame(read.csv("C:/Users/Carlos M Garcia/Google Drive/______tecnicasFES/foto/cond_const.txt", sep=""))
+
+polarizador <- read.csv("C:/Users/Carlos M Garcia/Google Drive/______tecnicasFES/foto/polarizador.txt", sep="")
+
+#names(cond_const)
+
+
+```
+
+Comezamos plantexando un contraste de independencia entre a diferenza de potencial no fotorresistor e condutancia (inverso da resistencia) que presenta. Para iso, asumimos a hipótese nula de que son independentes e axustamos un modelo ANOVA con dous grupos de medidas. A liña vermella representa a estimación da media para o grupo de medidas cos polarizadores alineados e a azul a mesma cantidade para a mostra cos polarizadores a 45º
+
+```{r echo=FALSE, fig.height=2.5}
+#plot((cond_const$ISC/cond_const$VSC)~cond_const$VSC)
+
+cond_const$thetaf=as.factor(cond_const$theta)
+cond_const$g=(cond_const$ISC/cond_const$VSC)
+
+msimple=lm(g~thetaf,data=cond_const)
+
+#summary(mconst)
+
+canova=coef(msimple)
+
+plot((cond_const$ISC/cond_const$VSC)~cond_const$VSC,xlab='V fotorresistor',ylab='Condutancia (mS)')
+abline(h=canova[1],col='red')
+abline(h=canova[1]+canova[2],col='blue')
+
+ancovam=lm(g~thetaf+VSC,data=cond_const)
+
+
+
+```
+```{r echo=FALSE}
+anova(msimple,ancovam)
+```
+
+Construímos un test F para contrastar se introducir unha pendente non nula (pasar a un modelo ANCOVA). Á vista do p-valor, non temos evidencia significativa para rexeitar a independencia da condutancia coa voltaxe e asumiremos que así é. 
+
+O seguinte paso é decidir como modelar a combinación das aportacións de senllas fontes: a contribución dos fotóns que proveñen dos polarizadores e aqueles proporcionados polo ambiente. 
+
+Formulamos dúas hipóteses, nas que $\theta$ é o ángulo entre polarizadores e $\Delta G$ representa oexceso de conductancia.
+
+\begin{enumerate}
+\item A célula non discrimina a orixe dos fotóns que chegan a ela e daquela o fluxo pasa a ser aditivo $\Phi_{t}=\Phi_{ambiental}+\Phi_{lampada}$. Daquela o modelo é $\Delta G=\sqrt{\left(a+b \cos ^{2} \theta\right)^{m}}$
+\item A célula distingue os fotóns que chegan dos polarizadores dos que chegan do entorno (ben porque o espectro ou a direcciónnon é o mesmo ou porque). As dúas canles contribúen de xeito independente á condutancia e é esta a que pasa a ser aditiva:
+$\Delta G=\sqrt{a^{m}}+\sqrt{\left(b \cos ^{2} \theta\right)^{m}}$
+
+\end{enumerate}
+
+
+
+
+
+En ambas formulacións, $m$ determina a eficacia dos fotóns á hora de xerar portadores e daquela esperámonos que \underline{non depende da luz ambiental}. Por construción, o mesmo se pode afirmar de $b$. Isto permite plantexar o seguinte criterio de selección:
+
+\begin{itemize}
+\item Eliximos un dos tres niveis de luz ambiental posibles. Axustamos cada unha dúas ecuacións conxecturadas cos (mesmos) datos correspondentes a ese nivel e gardamos as estimacións de $b$ e $m$ dadas por cada axuste. 
+\item Fixamos agora un nivel de luz ambiental distinto do anterior e axustamos para cada conxectura dous modelos:
+\begin{itemize}
+\item Un modelo A que empregue as estimacións realizadas co nivel de luz ambiente previo $\hat b_1,\hat b_2,\hat m_1,\hat m_2$ e só estime $a$
+\item Un modelo B que estime tanto $a$, como $b$ e como $m$ para o novo nivel de luz ambiente. 
+\end{itemize}
+Logo escolleremos a ecuación para a que \textit{menos mellore} a calidade do axuste ao pasar do modelo A ao B. 
+
+\end{itemize}.  
+
+```{r descuberto, include=FALSE}
+descuberto=polarizador[polarizador$luz_amb==2,]
+
+Gd=descuberto$ISC/descuberto$VSC
+
+thetad=descuberto$theta*2*pi/360
+
+plot(Gd~thetad)
+
+```
+
+```{r descuberto1, include=FALSE}
+
+#Axustamos a conxectura 1
+costheta2d=cos(thetad)^2
+
+md=lm(Gd^2~costheta2d)
+
+coef(md)
+
+plot(Gd^2~costheta2d)
+abline(md)
+
+summary(md)
+
+inid=coef(md)
+
+m1descuberto=nls(Gd~((a+b*cos(thetad)^2)^(eme/2)),start = list(a = inid[1], b = inid[2],eme=1))
+
+c1des=coef(m1descuberto)
+
+plot(Gd~thetad)
+lines(predict(m1descuberto)~thetad,col='red')
+
+```
+
+
+
+```{r descuberto2, include=FALSE}
+
+# Axustamos a conxectura 2
+
+costhetad=cos(thetad)
+
+md=lm(Gd~costhetad)
+
+coef(md)
+
+plot(Gd~costhetad)
+abline(md)
+
+summary(md)
+
+inid=coef(md)^2
+
+m2descuberto=nls(Gd~((a)^(eme/2)+(b*cos(thetad)^2)^(eme/2)),start = list(a = inid[1], b = inid[2],eme=1))
+
+c2des=coef(m2descuberto)
+
+
+
+```
+
+
+
+
+
+```{r toldo, include=FALSE}
+# Repetimos o procemento anterior para o toldo
+toldo=polarizador[polarizador$luz_amb==1,]
+
+Gt=toldo$ISC/toldo$VSC
+
+thetat=toldo$theta*2*pi/360
+
+plot(Gt~thetat)
+
+```
+
+
+
+```{r toldo1, include=FALSE}
+#Axustamos a conxectura 1
+costheta2t=cos(thetat)^2
+
+mt=lm(Gt^2~costheta2t)
+
+coef(mt)
+
+plot(Gt^2~costheta2t)
+abline(mt)
+
+summary(mt)
+
+init=coef(mt)
+
+mtoldo1a=nls(Gt~((a+c1des[2]*cos(thetat)^2)^(c1des[3]/2)),start = list(a = init[1]))
+
+mtoldo1b=nls(Gt~((a+b*cos(thetat)^2)^(eme/2)),start = list(a = init[1], b = init[2],eme=1))
+
+
+
+
+
+```
+
+
+
+
+```{r toldo2, include=FALSE}
+
+# Axustamos a conxectura 2
+costhetat=cos(thetat)
+
+mt=lm(Gt~costhetat)
+
+coef(mt)
+
+plot(Gt~costhetat)
+abline(mt)
+
+summary(mt)
+
+init=coef(mt)^2
+
+mtoldo2b=nls(Gt~((a)^(eme/2)+(b*cos(thetat)^2)^(eme/2)),start = list(a = inid[1], b = inid[2],eme=1))
+
+mtoldo2a=nls(Gt~((a)^(c2des[3]/2)+(c2des[2]*cos(thetat)^2)^(c2des[3]/2)),start = list(a = init[1]))
+
+summary(mtoldo2b)
+
+c2des=coef(m2descuberto)
+
+
+```
+
+
+
+```{r echo=FALSE, fig.height=2.7}
+
+par(mfrow=c(1,3))
+
+plot(Gd~thetad,main='Conxecturas 1 e 2 a plena luz',xlab='Theta rad',ylab='Condutancia (mS)')
+lines(predict(m1descuberto)~thetad,col='red')
+lines(predict(m2descuberto)~thetad,col='blue')
+
+plot(Gt~thetat,main='Conxectura 1 toldo parcial',xlab='Theta rad',ylab='Condutancia (mS)')
+
+lines(predict(mtoldo1a)~thetat,col='darkorange')
+lines(predict(mtoldo1b)~thetat,col='green')
+plot(Gt~thetat,main='Conxectura 2 toldo parcial',xlab='Theta rad',ylab='Condutancia (mS)')
+
+lines(predict(mtoldo2a)~thetat,col='darkorange')
+lines(predict(mtoldo2b)~thetat,col='green')
+
+```
+
+
+Á esquerda, a liña vermella é o axuste coa fórmula 1 aos datos plenamente expostos á luz ambiental mentres que a liña azul é o axuste aos mesmos datos coa fórmula 2. Xa se pode apreciar a simple vista nos extremos que funciona mellor a fórmula 2. 
+
+As liñas laranxas son axustes dos datos con luz externa parcialmente eliminada obtidos coa estimación de b con datos de luminosidade externa plena. As liñas verdes, deixando formar parte do axuste a b e a m (permitindo que varíen). Vemos que a conxectura de fluxo aditivo non é consistente á hora de utilizar o mesmo parámetro b para dúas iluminacións externas distintas. 
+
+
+```{r include=FALSE}
+anova(mtoldo1a,mtoldo1b)
+anova(mtoldo2a,mtoldo2b)
+
+```
+
+Aínda que nos dous casos se mellora de xeito significativo introducindo liberdade para o parámetro b, o valor do estatístico F é case tres veces máis pequeno (1482.7) para o caso da fórmula 2 (fronte a 3312.2 para a fórmula 1), o que significa que non é tan grave utilizar b e m obtidos coa outra luminosidade (o fisicamente lóxico) utilizando a fórmula de condutancia aditiva. As estimacións coa fórmula 2 son finalmente (NA significa que se forzou $a=0$)
+
+```{r include=FALSE}
+escuro=polarizador[polarizador$luz_amb==0,]
+
+Ge=escuro$ISC/escuro$VSC
+
+thetae=escuro$theta*2*pi/360
+
+plot(Ge~thetae)
+
+# Axustamos a conxectura 2
+costhetae=cos(thetae)
+
+me=lm(Ge~costhetae)
+
+coef(me)
+
+plot(Ge~costhetae)
+abline(me)
+
+summary(me)
+
+inie=as.numeric(coef(me)^2)
+
+mescuro2=nls(Ge~((b*cos(thetae)^2)^(eme/2)),start = list( b = inie[2],eme=0.5))
+
+plot(Ge~thetae)
+lines(predict(mescuro2)~thetae)
+
+
+
+summary(mescuro2)
+Escuro=c(NA,1.6001891,1.4401959)
+Toldo=c(0.6486336,1.4748003,1.4890730)
+Descuberto=c(1.2692260,1.4358491,1.4964447)
+
+
+
+summary(m2descuberto)
+
+
+```
+
+
+
+
+```{r echo=FALSE}
+library(knitr)
+kable(round(rbind(Escuro,Toldo,Descuberto),digits=2),col.names=c("a","b","m"))
+
+```
+
