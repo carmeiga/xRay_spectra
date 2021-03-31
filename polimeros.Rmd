@@ -1,0 +1,130 @@
+---
+title: "Polímeros"
+author: "Carlos García Meixide"
+date: "30/3/2021"
+output: pdf_document
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+setwd("C:/Users/Carlos M Garcia/Google Drive/______tecnicasFES")
+
+library(pracma)
+library(knitr)
+
+
+fixo<-read.csv("csvs/fixo-2AlfredoCarlos.csv")
+```
+
+
+
+As cintas adhesivas son polo xeral material propietario formado pola superposición de varias capas de distintos materiais:
+
+\begin{itemize}
+\item O propio adhesivo, que é un polímero que ao pegar non cambia a súa estrutura química.
+\item Un polímero que axuda a adherir o adhesivo á seguinte capa.
+\item O plástico que dá corpo ao fiso.
+\item Un precubrimento para suavizar.
+\end{itemize}
+
+
+
+```{r echo=FALSE,fig.height= 3}
+y=fixo$yobs
+theta=fixo$X.twotheta/2
+
+plot(y~theta,type='l',main="Difractograma fragmento fiso",ylab="Contas por segundo",xlab="Theta (graos sex)")
+
+```
+
+Os polímeros solidifícanse en varios estados da materia. A maioría dos polímeros comerciais
+son unha mezcla de estes estados. De feito, unha aplicación común da difracción de polímeros
+é determinar a cristalinidade ou tratar de diferenciar entre os estados. Deste xeito, no mesmo polímero, coexisten en determinada proporción as fases cristalina e amorfa dependendo de como se fabricou. 
+
+Tendo isto en conta, observamos na gráfica anterior que a partir dun umbral angular non se observan máis picos, a diferenza do que pasa cunha rede cristalina. Isto débese a que dacordo coa lei de Laue para haber interferencia construtiva a ángulos grandes entón os enteiros non negativos h, k e l que indexan a rede recíproca tamén o deben ser. Non obstante, as compoñentes amorfas rompen a periodicidade da rede recíproca invalidando os picos correspondentes a índices grandes 
+
+Por este motivo, centrámonos na rexión onde existen máximos de difracción distinguibles. 
+
+ 
+```{r include=FALSE}
+
+ind=theta<14 & theta > 6
+
+source('baseline/baseline.mor.R')
+
+bl.mor       <- baseline.mor(y[ind], mor_getwopt(y[ind]))
+# esta foi a mellor con diferencia
+```
+
+```{r echo=FALSE, fig.height= 2.5}
+
+
+picos=abs(y[ind]-bl.mor)
+
+par(mfrow=c(1,2))
+plot(picos~theta[ind],type='l',main='Zoom co fondo substraído',ylab="Contas por segundo",xlab="Theta (graos sex)")
+
+
+plot(sqrt((y[ind]))~theta[ind],type='l',ylab="sqrt(Contas por segundo)",xlab="Theta (graos sex)",main='Zoom estimación do baseline')
+lines(sqrt(abs(as.numeric(bl.mor)))~theta[ind],type='l',col='red')
+
+```
+
+O polipropileno, un material termoplástico, prodúcese polimerizando moléculas de propileno. É unha cadea linear de hidrocarburos sen insaturación e resúltanos de interese porque ten unha presenza importante na composición de moitas cintas adhesivas. Existen tres tipos de polipropileno segundo a colocación dos grupos metilo na cadea: o isotáctico (moi cristalino), sindiotáctico (menos cristalino) e atáctico (practicamente amorfo). O que observamos co difractómetro é unha superposición destas tres variantes, vindo dados cadanseus picos polas diferentes simetrías cristalográficas que presenta cada tipo. 
+
+
+De xeito moi cualitativo, é posible identificar o primeiro pico da nosa medida co polipropileno isotáctico 110 e o segundo como unha mestura do sindiotáctico 300 e isotáctico 040 \cite{poliprop}.
+
+
+Calculamos agora a cristalinidade como o cociente da integral da gráfica anterior (área baixo os picos co continuo extraído) entre a integral do difractograma sen extraer o baseline. Volvemos considerar soamente o intervalo onde hai picos xa que fóra del as contribucións ás áreas son nulas. O resultado foi $\textrm{Cristalinidade} = \frac{2476.515}{3658.01}= 0.68$ 
+
+```{r echo=FALSE}
+integralpicos=sum(picos)*0.01
+integraltotal=sum(y[ind])*0.01
+
+CI=integralpicos/integraltotal
+```
+
+
+Por outra banda, o polietileno (PET) é un termoplástico semicristalino con mellor resistencia química e máis resistencia elécrica que os polímeros puramente amorfos. 
+
+Tomáronse dúas series de medidas, unha coa mesma mostra xirada 90 graos con respecto da outra. Debemos ter en conta que non foi este cambio xeométrico a causa de que un padrón sexa máis achatado ca o outro. Simplemente, os raios X non incidiron sobre a totalidade da mostra coa nova colocación por ser o portamostras máis largo que ancho. 
+
+
+```{r echo=FALSE, fig.height= 2.9}
+poli1<-read.csv("csvs/PET1-AlfredoCarlos.csv")
+poli2<-read.csv("csvs/PET2-AlfredoCarlos.csv")
+
+theta1=poli1$X.twotheta
+theta2=poli2$X.twotheta
+
+i1=poli1$yobs
+i2=poli2$yobs
+
+plot(i1~theta1,type='l',main='Polietileno',ylab="Contas por segundo",xlab="Theta (graos sex)",col='darkblue')
+lines(i2~theta2,type='l',col='purple')
+
+```
+
+
+
+
+
+\begin{thebibliography}{99}
+	
+	
+	\bibitem{cris} Ruland W: X-ray determination of crystallinity and diffuse disorder scattering. Acta Cryst 1961, 14: 1180-1185. 10.1107/S0365110X61003429
+	
+	\bibitem{poliprop} Türkçü, Harun Nezih. Investigation of the crystallinity and orientation of polypropylene with respect to temperature changes using FT-IR, WRD, and Raman techniques. Diss. Bilkent University, 2004.
+
+
+
+
+
+
+
+\end{thebibliography}

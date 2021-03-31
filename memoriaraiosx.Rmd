@@ -1,0 +1,410 @@
+---
+title: "Raios X"
+author: "Carlos García Meixide"
+date: "28/3/2021"
+output: pdf_document
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r include=FALSE}
+setwd("C:/Users/Carlos M Garcia/Google Drive/______tecnicasFES")
+
+library(pracma)
+library(knitr)
+
+nacl <- read.csv("csvs/NaCl-AlfredoCarlos.csv")
+```
+# Introdución, descrición e montaxe
+
+Comezaremos por describir brevemente o funcionamento do difractómetro de raios X Rigaku Miniflex II. Trátase dun equipo experimental para analizar mostras en pó que debemos de conseguir utilizando un morteiro para desfacer a textura areosa coa que estamos familiarizados. 
+
+Unha vez obtido o pó, precisamos que se adhira ao portamostras o suficiente como para que soporte unha inclinación de 45 graos sen deslizarse. Debemos lembrar que tanto o pegamento (en caso de utilizalo) como o portamostras deben ser amorfos para non teren os seus propios picos de difracción. 
+
+ 
+
+Examinando a cámara de medida, atopamos dous mecanismos rotatorios: un no que se coloca o portamostras e outro solidario a un detector. A dinámica angular destas compoñentes respecta a xeometría $\theta$-$2\theta$. Isto quere dicir que tanto o ángulo de incidencia sobre a mostra como o ángulo dos feixes refractados é $\theta$. Deste xeito, o feixe incidente e o detector sempre formarán un ángulo $2 \theta$. 
+
+O canón de raios X precisa dun circuíto refrixerador que alimentaremos con auga da billa. Unha vez instalado, podemos encender o difractómetro.
+
+Debemos ter precaución con non comezar as medidas en 0º xa que estariamos incidindo directamente cos raios X consumindo moito detector, o que reduciría notablemente a súa vida útil. Daquela permitiremos que $2 \theta$ varíe entre aproximadamente 7 e 45º. 
+
+O punto de partida teórico é a ecuación de Laue
+
+$$
+\frac{1}{2} G=k \operatorname{sen} \theta \Rightarrow G=\frac{4 \pi}{\lambda} \operatorname{sen} \theta
+$$
+Onde $G$ é a magnitude de calquera vector da rede recíproca, a é a constante de rede, $\lambda$ a lonxitude de onda e $\theta$ é a metade do ángulo entre os raios incidente e difractado. 
+Para unha rede simple cubic temos que $G=\frac{2 \pi}{a} \sqrt{h^{2}+k^{2}+l^{2}},$ sendo $(\mathrm{h}, \mathrm{k}, \mathrm{l})$ enteiros arbirarios. 
+
+# Procesado de sinal e datos
+
+Os canóns de raios X poden emitir radiación con lonxitudes de onda moi ben definidas. Isto conséguese neste caso excitando un fragmento de cobre con pulsos de elevada voltaxe (de aí que se precise refrixeración). Cando se retira este campo eléctrico externo, os electróns que promocionaron retornan aos orbitais menos enerxéticos emitindo fotóns cunha frecuencia moi ben definida. O noso dispositivo emite nas seguintes transicións espetrográficas (en notación Siegbahn):
+
+
+
+
+\begin{itemize}
+
+\item $\lambda(K\alpha_1)$=0.15405 nm
+\item $\lambda(K\alpha_2)$=0.15443 nm
+\item $\lambda(K\beta)$=0.13920 nm
+
+\end{itemize}
+
+
+En virtude da ecuación de Laue, cada unha das tres ondas case-monocromáticas vai dar lugar a picos sitos en ángulos un pouco distintos. Daquela cada pico é en realidade a superposición de tres con diferentes intensidades relativas, sendo a dominante a da $K\alpha_1$.
+
+No detector hai instalado un filtro de $K\beta$ formado por unhas barras de grafito. Non obstante, é preciso eliminar a contribución $K\alpha_2$ con algoritmos de procesado de sinal \cite{holandeses}
+
+Estamos interesados na estimación de senllos padróns por separado para $K \alpha_{1}$ e $K \alpha_{2}$. Para isto, combinamos a metodoloxía P-spline co \textit{composite link model (CLM)}. O CLM é unha extensión do modelo linear xeneralizado a observacións indirectas de series de tempo. A combinación de P-splines co CLM denomínase \textit{penalized composite link model (PCLM)}.
+
+Un difractograma é unha serie temporal de contas na que cada unha delas se distribúe cunha Poisson. Utilizando GLM, as contas modelizaríanse con $\mathbf{E}(\mathbf{y})=\mu$, que asumimos ser a suma de dúas compoñentes $K \alpha_{1}$ e $K \alpha_{2}$, para o que engadimos unha matriz de composición $C$ ao GLM. Os elementos de $C$ describen como se combinan as correspondentes esperanzas latentes de cada compoñente. Asumimos a mesma forma para ambas compoñentes e entón $C=[I \mid \tau I]$. Aplicando $\mathrm{PCLM},$ a esperanza das contas modélase como
+$$
+\mathbf{E}(\mathbf{y})=\mu=C \gamma
+$$
+O que resulta en $\mu=\gamma_{1}+\gamma_{2} \tau,$ onde $\gamma_{1}$ se refire á contribución $K \alpha_{1}$ e $\gamma_{2}$ á $K \alpha_{2}$. $\tau$ define a intensidade relativa das dúas compoñentes e fíxase en 0.5. Por último, as esperanzas modélanse con P-splines
+$$
+\gamma_{1}=\exp \left(B_{1} \beta\right)=\operatorname{cxp}\left[\sum_{k} \beta_{k} B_{k}\left(\rho_{j}\right)\right]
+$$
+and
+$$
+\gamma_{2}=\exp \left(B_{2} \beta\right)=\exp \left[\sum_{\bar{k}} \beta_{k} B_{k}\left(\rho_{j}+\delta_{j}\right)\right]
+$$
+con $\rho=2 \theta$ e $\delta$ a interdistancia do dobrete, que se calcula como
+$$
+\delta=2 \arcsin \left(\frac{\lambda_{2}}{\lambda_{1} \sin \theta}\right)-2 \theta
+$$
+con $\lambda_{2}$ e $\lambda_{1}$ as lonxitudes de onda de $K \alpha_{2}$ e $K \alpha_{1}$ respectivamente. 
+
+A finalidade principal deste traballo é a análise do espectrograma dunha mostra de cloruro de sodio (sal común) composta de 4051 observacións de pares $(\theta,\textrm{contas})$. Dada a gran extensión da serie de medidas, non se inclúen explicitamente táboas de datos na memoria. Tanto o código empregado coma os espectrogramas medidos poden consultarse en \url{https://github.com/carmeiga}.
+
+# Análise
+
+Presentamos a continuación o difractograma orixinal (arriba) e a serie unha vez extraída a contribución $K\alpha_{2}$ co framework exposto anteriormente. 
+
+```{r include=FALSE}
+yorix=nacl$yobs
+theta=nacl$X.twotheta/2
+
+#trsei=which.min(abs(theta-36.53))
+#trset=which.min(abs(theta-37.64))
+
+
+
+```
+
+```{r echo=FALSE, fig.height=5.5}
+#points(y[trsei]~theta[trsei],col='green')
+#points(y[trset]~theta[trset],col='blue')
+
+#tras executar o script de eliminar kalpha2
+#y=Mk$yhat
+
+#write.csv(y,'salsenka')
+y<- as.numeric(read.csv("C:/Users/Carlos M Garcia/Google Drive/______tecnicasFES/salsenka")$x)
+par(mfrow=c(2,1))
+plot(sqrt(yorix)~theta,main="Difractograma orixinal sal",xlab='Theta (graos sex)',ylab='sqrt(Contas por segundo)',type='l')
+plot(sqrt(y)~theta,type='l',main="Sen Ka2",xlab='Theta (graos sex)',ylab='sqrt(Contas por segundo)')
+```
+
+Extraemos os ángulos que dan lugar a picos cun algoritmo tipo peak detection e facemos unha representación gráfica illada de cada un deles. Na seguinte páxina, as gráficas con liñas descontinuas amosan como serían os picos sen extraer a contribución $K\alpha_{2}$ 
+```{r include=FALSE}
+maiordez=(theta>10)
+theta=theta[maiordez]
+y=y[maiordez]
+yorix=yorix[maiordez]
+p=9
+pea=sort(findpeaks(y, npeaks=p, minpeakdistance=100,threshold=0, sortstr=FALSE)[,2])
+
+
+```
+
+```{r echo=FALSE, fig.height=9}
+
+
+
+fwhms=numeric(p)
+#par(mfrow=c(2,4))
+ang=numeric(p)
+
+par(mfrow=c(3,3))
+
+for(k in 1:p) {
+m=pea[k]
+ang[k]=theta[m]
+a=theta[m]-1/3
+b=theta[m]+1/3
+
+a1=which.min(abs(a-theta))
+b1=which.min(abs(b-theta))
+
+
+tot=a1:b1
+
+
+yt=y[tot]
+tt=theta[tot]
+plot(yt~tt,type='l',main=as.character(theta[m]),ylab='Contas por segundo',xlab='Theta (graos sex)')
+
+
+# code from 
+# https://stackoverflow.com/questions/25015410/r-find-full-width-at-half-maximum-for-a-gausian-density-distribution
+
+xmax <- tt[yt==max(yt)]
+
+x1 <- tt[tt < xmax][which.min(abs(yt[tt < xmax]-max(yt)/2))]
+x2 <- tt[tt > xmax][which.min(abs(yt[tt > xmax]-max(yt)/2))]
+#points(c(x1, x2), c(yt[tt==x1], yt[tt==x2]), col="red")
+
+fwhms[k]=x2-x1
+sigmas=fwhms/2.3548
+
+tab1=data.frame(ang=ang,sigmas=round(sigmas,digits=2))
+
+
+
+}
+```
+```{r echo=FALSE, fig.height=9}
+
+
+
+fwhms=numeric(p)
+#par(mfrow=c(2,4))
+ang=numeric(p)
+
+y=yorix
+
+par(mfrow=c(3,3))
+
+for(k in 1:p) {
+m=pea[k]
+ang[k]=theta[m]
+a=theta[m]-1/3
+b=theta[m]+1/3
+
+a1=which.min(abs(a-theta))
+b1=which.min(abs(b-theta))
+
+
+tot=a1:b1
+
+
+yt=y[tot]
+tt=theta[tot]
+plot(yt~tt,type='l',lty=2,main=as.character(theta[m]),ylab='Contas por segundo',xlab='Theta (graos sex)')
+
+
+# code from 
+# https://stackoverflow.com/questions/25015410/r-find-full-width-at-half-maximum-for-a-gausian-density-distribution
+
+xmax <- tt[yt==max(yt)]
+
+x1 <- tt[tt < xmax][which.min(abs(yt[tt < xmax]-max(yt)/2))]
+x2 <- tt[tt > xmax][which.min(abs(yt[tt > xmax]-max(yt)/2))]
+#points(c(x1, x2), c(yt[tt==x1], yt[tt==x2]), col="red")
+
+fwhms[k]=x2-x1
+sigmas=fwhms/2.3548
+
+tab1=data.frame(ang=ang,sigmas=round(sigmas,digits=2))
+
+
+
+}
+```
+Calculamos as incertezas angulares asumindo que a distribución de cada pico é gaussiana. Baixo esta hipótese, pode derivarse unha expresión pechada que relaciona o Full Width Half Maximum (que podemos calcular numericamente) coa desviación típica do erro. Comezamos igualando á metade da altura.
+
+$$
+e^{-\left(x_{0}-\mu\right)^{2} /\left(2 \sigma^{2}\right)}=\frac{1}{2} f\left(x_{\max }\right)
+$$
+
+onde f é a densidade gaussiana de media $\mu$ e varianza $\sigma^2$. $f\left(x_{\max }\right)$ acontece en $x_{\max }=\mu, \mathrm{so}$
+$$
+e^{-\left(x_{0}-\mu\right)^{2} /\left(2 \sigma^{2}\right)}=\frac{1}{2} f(\mu)=\frac{1}{2}
+$$
+Despexando
+$$
+\begin{array}{l}
+e^{-\left(x_{0}-\mu\right)^{2} /\left(2 \sigma^{2}\right)}=2^{-1} \\
+-\frac{\left(x_{0}-\mu\right)^{2}}{2 \sigma^{2}}=-\ln 2 \\
+\left(x_{0}-\mu\right)^{2}=2 \sigma^{2} \ln 2 \\
+x_{0}=\pm \sigma \sqrt{2 \ln 2}+\mu .
+\end{array}
+$$
+Entón FWHM vén dado por
+$$
+\text { FWHM } \equiv x_{+}-x_{-}=2 \sqrt{2 \ln 2} \sigma \approx 2.3548 \sigma \text { . }
+$$
+
+De aquí xa despexamos $\sigma$ (incerteza) para cada ángulo tendo estimado facilmente FWHM. Recollemos os resultados na seguinte táboa
+
+```{r echo=FALSE}
+kable(tab1, col.names = c("Ángulo (º)",
+                           "Incerteza (º)"))
+```
+ A amplitude da onda electromagnética dispersada é non nula só se o vector de onda incidente cumpre a ecuación de Laue para algún vector da rede recíproca. Pero con isto non basta para que haxa interferencia construtiva, xa que o factor de forma fai que algúns picos que en principio son permitidos pola ecuación de Laue pasen a non selo. 
+
+En condicións de máximo de difracción
+$$
+\Delta \vec{k}=\vec{G}
+$$
+tense que a amplitude
+$$
+A \propto N S_{\vec{G}} \quad \text { con } \quad S_{\vec{G}}=\sum_{j}^{\text {base }} f_{j} \mathrm{e}^{-i \vec{r}_{j} \cdot \vec{G}}
+$$
+ao que se lle chama factor de estrutura da base. 
+
+Tentaremos estimar a interdistancia $\frac{a}{2}$ entre cada catión sodio e cada anión cloro da estrutura cristalina do sal. Faremos a hipótese de que se trata dunha rede fcc con base diatómica. Para calcular o factor de estrutura, modelamos \textbf{a rede} cunha estrutura sc + base
+$$
+\begin{array}{lllll}
+\text { Posicions } f c c & a(0,0,0) & \frac{a}{2}(1,0,1) & \frac{a}{2}(0,1,1) & \frac{a}{2}(1,1,0) 
+\end{array}
+$$
+Obtemos o factor de estrutura:
+
+$$S_{\vec{G}}=f \cdot\left[1+\mathrm{e}^{\pi i(k+l)}+\mathrm{e}^{\pi i(h+l)}+\mathrm{e}^{\pi i(h+k)}\right]$$
+
+
+
+
+
+De onde deducimos que 
+
+$$
+S_{\vec{G}}=0 \text { se e só se } \text{h, k, l teñen distinta paridade}.
+$$
+
+Cómpre remarcar que puidemos sacar factor común o factor de forma $f$ porque se refire a unha parella de ións, isto é, é o mesmo para todos os puntos da rede fcc. É a estrutura de rede a que está prohibindo certos máximos; no fondo, o carácter diatómico da base non intervén neste fenómeno. 
+
+Cómpre remarcar que puidemos sacar factor común o factor de forma $f$ porque se refire a unha parella de ións, isto é, é o mesmo para todos os puntos da rede fcc. É a estrutura de rede a que está prohibindo certos máximos; no fondo, o carácter diatómico da base non intervén neste fenómeno. 
+
+O seguinte paso é elixir as ternas $(h,k,l)$ permitidas e escollemos as p primeiras por orde de módulo crecente, onde p é o número de picos detectados. A continuación avaliamos as expresións
+$\lambda \sqrt{h^2+k^2+l^2}$  e $2 \sin \theta$ (esta última ordenandoa segundo ángulos crecentes) e obtemos p puntos que segundo a ecuación de Laue seguen un modelo linear con intercepto 0 e pendente precisamente $a$. 
+
+```{r include=FALSE}
+enteiros=matrix(c(
+1,	0,	0,
+1,	1,	0,
+1,	1,	1,
+2,	0,	0,
+2,	1,	0,
+2,	1,	1,
+2,	2,	0,
+2,	2,	1,
+#3,	0,	0, da o mesmo que 221
+3,	1,	0,
+3,	1,	1,
+2,	2,	2,
+4,  0,  0,
+3,  3,  1,
+
+4,0,2,
+4,2,2),ncol=3,byrow=TRUE)
+
+h=enteiros[,1]
+k=enteiros[,2]
+l=enteiros[,3]
+
+
+scind=((h%%2 +k%%2 + l%%2) == 3) | ((h%%2 +k%%2 + l%%2) == 0) 
+sc=enteiros[scind,]
+h=sc[,1]
+k=sc[,2]
+l=sc[,3]
+
+
+
+
+
+
+```
+
+```{r echo=FALSE}
+#anominal=0.56402 #nm
+lambda=0.15405 #ka1
+
+picos=ang
+
+xreg=2*sin(picos*2*pi/360)
+yreg=lambda*sqrt(h^2+k^2+l^2)
+
+mod=lm(yreg~xreg)
+
+summary(mod)
+
+```
+
+Vemos que a estimación para a constante de rede é 0.5681 nm. Tamén podemos estimar unha rexión de confianza ao 95%  
+
+```{r}
+confint(mod)
+```
+
+Concluíndo que cunha cobertura do 95% temos que o intervalo de confianza é $(0.5664 ,0.5697)$
+
+
+
+```{r echo=FALSE, fig.height=3}
+plot(yreg~xreg,main='Lei de Laue axustada para estimar a',xlab='2sin(theta)',ylab='lambda*sqrt(h^2+k^2+l^2)')
+abline(mod)
+```
+
+
+ Para finalizar, engadimos unha táboa na que engadimos todas as combinacións de $(h,k,l)$ que proporcionan picos permitidos pola ecuación de Laue e unha estimación dos ángulos aos que acontecen utilizando o valor de $a$ estimado con regresión linear. NA significa que a interferencia construtiva con ese ángulo está prohibida polo factor de estrutura. Cara ao final omítense as combinacións prohibidas para non alargar demasiado a táboa.
+ 
+```{r echo=FALSE}
+angle=asin(lambda*sqrt(h^2+k^2+l^2)/(2*a))*360/(2*pi)
+
+sumacadrados=(2*a*sin(picos*2*pi/360)/lambda)^2
+
+
+# por que non aparece o 3,3,1?? decatarse de que antes de quitar kalpha2 habia dous picos!!!! ver que pasa co 333
+
+
+#indaux[ord,]
+
+h=enteiros[,1]
+k=enteiros[,2]
+l=enteiros[,3]
+
+a=coef(mod)[2]
+nominal_angle=asin(lambda*sqrt(h^2+k^2+l^2)/(2*a))*360/(2*pi)
+
+ang_completo=c(NA,NA,14.08,16.16,NA,NA,23.03,NA,NA,27.26,28.01,33.39,36.77,37.87,42.25)
+kable(cbind(enteiros,round(nominal_angle,digits=2),ang_completo),col.names=c('h','k','l','Theta Laue (º)','Theta empírico (º)'))
+
+```
+
+
+# Conclusión
+Esta práctica foi unha introdución aos elementos máis básicos da metodoloxía tanto experimental como de análise de datos da espectroscopía con raios X. 
+
+O feito máis importante co que nos quedamos é a tremenda precisión desta técnica. Considerando o feito de que na literatura se lle asigna o valor 0.564 nm ao parámetro de rede do sal común, a nosa medida tan só errou por centésimas de ángstrom.
+
+
+A maiores disto, os datos recollidos amosan moi pouca varianza, feito que reforza de xeito titánico a validez dos modelos estatísticos empregados á hora de facer predicións. Sen ir máis lonxe, o $R^2$ do axuste linear resultou ter a nivel computacional un valor exactamente de 1! Podemos confirmar a excelencia dos resultados ollando a representación gráfica do axuste, na que todos os puntos caen perfectamente sobre a recta. Todo isto permitiría a observación de deformacións e dilatacións térmicas de centésimas de ángstrom. 
+
+Para finalizar, pensemos que Röntgen identificou os descoñecidos raios "X" unha década despois da invención do interferómetro de Michelson e Morley, dispositivo que permitiu a importante corroboración experimental da estrutura fina do átomo de Hidróxeno en 1887. Sendo os protagonistas do achádego máis importante da bioloxía contemporánea- a estrutura de dobre hélice do ADN- os raios X seguen a ser hoxe en día fundamentais en disciplinas como a medicina, a astrofísica, os sistemas de seguridade e o deseño de materiais. 
+\begin{thebibliography}{99}
+	
+	
+
+	
+	\bibitem{holandeses} de Rooi, Johan J., et al. "Smoothing of X-ray diffraction data and Kalpha2 elimination using penalized likelihood and the composite link model." Journal of Applied Crystallography 47.3 (2014): 852-860.
+
+
+
+
+
+
+
+
+
+\end{thebibliography}
+
